@@ -11,7 +11,14 @@ const int daylightOffset_sec = 3600;    // DST +1 hour
 void printLocalTime() {
   struct tm timeinfo;
   if(!getLocalTime(&timeinfo)){
-    Serial.println("Failed to obtain time");
+    Serial.println("ERROR CODE: NTP_SYNC_FAILED");
+    Serial.print("Error Details: Unable to retrieve time from NTP server | ");
+    Serial.print("Epoch: ");
+    time_t now;
+    time(&now);
+    Serial.print(now);
+    Serial.print(" | WiFi Status: ");
+    Serial.println(WiFi.status());
     return;
   }
   Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
