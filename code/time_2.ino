@@ -1,12 +1,8 @@
 #include <WiFi.h>
-#include "time.h"
+#include <HTTPClient.h>
 
 const char* ssid = "Caltech Visitor";
 const char* password = NULL;
-
-const char* ntpServer = "pool.ntp.org";
-const long gmtOffset_sec = -28800;      // PST is UTC-8
-const int daylightOffset_sec = 3600;    // DST +1 hour
 
 void setup() {
   Serial.begin(115200);
@@ -23,45 +19,63 @@ void setup() {
   Serial.print("IP Address: ");
   Serial.println(WiFi.localIP());
   
-  // Configure NTP
-  Serial.println("\nConfiguring NTP...");
-  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-  
-  // Wait for time sync
-  Serial.println("Waiting for NTP sync...");
-  struct tm timeinfo;
-  int attempts = 0;
-  while (!getLocalTime(&timeinfo) && attempts < 20) {
-    Serial.print(".");
-    delay(1000);
-    attempts++;
-  }
-  
-  if (attempts >= 20) {
-    Serial.println("\nERROR: NTP sync failed after 20 seconds");
-    Serial.println("NTP port (123 UDP) might be blocked");
-  } else {
-    Serial.println("\nNTP sync successful!");
-    printTime();
-  }
+  Serial.println("\n--- Getting Time from HTTP API ---");
+  getTimeFromHTTP();
 }
 
-void printTime() {
-  struct tm timeinfo;
-  if (!getLocalTime(&timeinfo)) {
-    Serial.println("ERROR: Cannot get time");
-    return;
+void getTimeFromHTTP() {
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    
+    // Using worldtimeapi.org - returns simple text format
+    Serial.println("Fetching time from worldtimeapi.org...");
+    http.begin("http://worldtimeapi.org/api/timezone/America/Los_Angeles");
+    http.setTimeout(5000);
+    
+    int httpCode = http.GET();
+    
+    if (httpCode == 200) {
+      String response = http.getString();
+      Serial.println("\n✓ SUCCESS! Time received:");
+      Serial.println("=====================================");
+      
+      // Extract datetime
+      int datetimeIndex = response.indexOf("\"datetime\":\"");
+      if (datetimeIndex > 0) {
+        int start = datetimeIndex + 12;
+        int end = response.indexOf("\"", start);
+        String datetime = response.substring(start, end);
+        Serial.print("Current Time: ");
+        Serial.println(datetime);
+      }
+      
+      // Extract unix time
+      int unixtimeIndex = response.indexOf("\"unixtime\":");
+      if (unixtimeIndex > 0) {
+        int start = unixtimeIndex + 11;
+        int end = response.indexOf(",", start);
+        String unixtime = response.substring(start, end);
+        Serial.print("Unix Timestamp: ");
+        Serial.println(unixtime);
+      }
+      
+      Serial.println("=====================================");
+      
+    } else {
+      Serial.println("✗ FAILED!");
+      Serial.print("HTTP Error Code: ");
+      Serial.println(httpCode);
+    }
+    
+    http.end();
+    
+  } else {
+    Serial.println("WiFi disconnected!");
   }
-  
-  Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
-  
-  time_t now;
-  time(&now);
-  Serial.print("Unix timestamp: ");
-  Serial.println(now);
 }
 
 void loop() {
   delay(5000);
-  printTime();
+  Serial.println("\n--- Refreshing ---");
+  getTimeFromHTTP();
 }
