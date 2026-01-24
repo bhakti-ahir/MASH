@@ -7,3 +7,6 @@ secureClient.setCACert(influxRootCACert);
 
 to view the contents of certificate
 openssl x509 -in certificate.pem -text
+
+or this command
+keytool -printcert -file certificate.pem
